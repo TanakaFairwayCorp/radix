@@ -21,8 +21,17 @@ var PipelineQueueEmptyError error = errors.New("pipeline queue empty")
 
 //* Client
 
-// Client describes a Redis client.
-type Client struct {
+// Interface common to all Redis clients
+type Client interface {
+  Append(cmd string, args ...interface{})
+  Close() error
+  Cmd(cmd string, args ...interface{}) *Reply
+  GetReply() *Reply
+  ReadReply() *Reply
+}
+
+// DefaultClient describes a Redis client.
+type DefaultClient struct {
 	// The connection the client talks to redis over. Don't touch this unless
 	// you know what you're doing.
 	Conn      net.Conn
@@ -47,7 +56,7 @@ func DialTimeout(network, addr string, timeout time.Duration) (*Client, error) {
 		return nil, err
 	}
 
-	c := new(Client)
+	c := new(DefaultClient)
 	c.Conn = conn
 	c.timeout = timeout
 	c.reader = bufio.NewReaderSize(conn, bufSize)
@@ -62,12 +71,12 @@ func Dial(network, addr string) (*Client, error) {
 //* Public methods
 
 // Close closes the connection.
-func (c *Client) Close() error {
+func (c *DefaultClient) Close() error {
 	return c.Conn.Close()
 }
 
 // Cmd calls the given Redis command.
-func (c *Client) Cmd(cmd string, args ...interface{}) *Reply {
+func (c *DefaultClient) Cmd(cmd string, args ...interface{}) *Reply {
 	err := c.writeRequest(&request{cmd, args})
 	if err != nil {
 		return &Reply{Type: ErrorReply, Err: err}
@@ -77,14 +86,14 @@ func (c *Client) Cmd(cmd string, args ...interface{}) *Reply {
 
 // Append adds the given call to the pipeline queue.
 // Use GetReply() to read the reply.
-func (c *Client) Append(cmd string, args ...interface{}) {
+func (c *DefaultClient) Append(cmd string, args ...interface{}) {
 	c.pending = append(c.pending, &request{cmd, args})
 }
 
 // GetReply returns the reply for the next request in the pipeline queue.
 // Error reply with PipelineQueueEmptyError is returned,
 // if the pipeline queue is empty.
-func (c *Client) GetReply() *Reply {
+func (c *DefaultClient) GetReply() *Reply {
 	if len(c.completed) > 0 {
 		r := c.completed[0]
 		c.completed = c.completed[1:]
@@ -113,13 +122,13 @@ func (c *Client) GetReply() *Reply {
 
 //* Private methods
 
-func (c *Client) setReadTimeout() {
+func (c *DefaultClient) setReadTimeout() {
 	if c.timeout != 0 {
 		c.Conn.SetReadDeadline(time.Now().Add(c.timeout))
 	}
 }
 
-func (c *Client) setWriteTimeout() {
+func (c *DefaultClient) setWriteTimeout() {
 	if c.timeout != 0 {
 		c.Conn.SetWriteDeadline(time.Now().Add(c.timeout))
 	}
@@ -141,12 +150,12 @@ func (c *Client) setWriteTimeout() {
 //
 // Note: this is a more low-level function, you really shouldn't have to
 // actually use it unless you're writing your own pub/sub code
-func (c *Client) ReadReply() *Reply {
+func (c *DefaultClient) ReadReply() *Reply {
 	c.setReadTimeout()
 	return c.parse()
 }
 
-func (c *Client) writeRequest(requests ...*request) error {
+func (c *DefaultClient) writeRequest(requests ...*request) error {
 	c.setWriteTimeout()
 	for i := range requests {
 		req := make([]interface{}, 0, len(requests[i].args)+1)
@@ -161,7 +170,7 @@ func (c *Client) writeRequest(requests ...*request) error {
 	return nil
 }
 
-func (c *Client) parse() *Reply {
+func (c *DefaultClient) parse() *Reply {
 	m, err := resp.ReadMessage(c.reader)
 	if err != nil {
 		if t, ok := err.(*net.OpError); !ok || !t.Timeout() {
