@@ -21,7 +21,7 @@ const (
 
 // SubClient wraps a Redis client to provide convenience methods for Pub/Sub functionality.
 type SubClient struct {
-	Client   *redis.Client
+	Client   redis.Client
 	messages *list.List
 }
 
@@ -46,7 +46,7 @@ func (r *SubReply) Timeout() bool {
 	return ok && t.Timeout()
 }
 
-func NewSubClient(client *redis.Client) *SubClient {
+func NewSubClient(client redis.Client) *SubClient {
 	return &SubClient{client, &list.List{}}
 }
 

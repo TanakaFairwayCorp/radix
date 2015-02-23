@@ -11,7 +11,7 @@ func TestPool(t *T) {
 		t.Fatal(err)
 	}
 
-	conns := make([]*redis.Client, 20)
+	conns := make([]redis.Client, 20)
 	for i := range conns {
 		if conns[i], err = pool.Get(); err != nil {
 			t.Fatal(err)

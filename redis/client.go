@@ -49,7 +49,7 @@ type request struct {
 
 // Dial connects to the given Redis server with the given timeout, which will be
 // used as the read/write timeout when communicating with redis
-func DialTimeout(network, addr string, timeout time.Duration) (*Client, error) {
+func DialTimeout(network, addr string, timeout time.Duration) (Client, error) {
 	// establish a connection
 	conn, err := net.DialTimeout(network, addr, timeout)
 	if err != nil {
@@ -64,7 +64,7 @@ func DialTimeout(network, addr string, timeout time.Duration) (*Client, error) {
 }
 
 // Dial connects to the given Redis server.
-func Dial(network, addr string) (*Client, error) {
+func Dial(network, addr string) (Client, error) {
 	return DialTimeout(network, addr, time.Duration(0))
 }
 

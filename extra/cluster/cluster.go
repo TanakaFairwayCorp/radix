@@ -46,7 +46,7 @@ var (
 
 type connTup struct {
 	addr string
-	conn *redis.Client
+	conn redis.Client
 	err  error
 }
 
@@ -146,7 +146,7 @@ func newPool(
 ) (
 	*pool.Pool, error,
 ) {
-	df := func(network, addr string) (*redis.Client, error) {
+	df := func(network, addr string) (redis.Client, error) {
 		return redis.DialTimeout(network, addr, timeout)
 	}
 	return pool.NewCustomPool("tcp", addr, poolSize, df)
@@ -167,7 +167,7 @@ func (c *Cluster) spin() {
 // Returns a connection for the given key or given address, depending on which
 // is set. Even if addr is given the returned addr may be different, if that
 // addr didn't have an associated pool
-func (c *Cluster) getConn(key, addr string) (string, *redis.Client, error) {
+func (c *Cluster) getConn(key, addr string) (string, redis.Client, error) {
 	respCh := make(chan *connTup)
 	c.callCh <- func(c *Cluster) {
 		if key != "" {
@@ -210,7 +210,7 @@ func (c *Cluster) getConn(key, addr string) (string, *redis.Client, error) {
 // pointer to an error which can be used to decide whether or not to put the
 // connection back. It's a pointer because this method is deferable (like
 // CarefullyPut)
-func (c *Cluster) putConn(addr string, conn *redis.Client, maybeErr *error) {
+func (c *Cluster) putConn(addr string, conn redis.Client, maybeErr *error) {
 	c.callCh <- func(c *Cluster) {
 		pool := c.pools[addr]
 		if pool == nil {
@@ -389,7 +389,7 @@ func justTried(tried map[string]bool, addr string) map[string]bool {
 }
 
 func (c *Cluster) clientCmd(
-	addr string, client *redis.Client, cmd string, args []interface{}, ask bool,
+	addr string, client redis.Client, cmd string, args []interface{}, ask bool,
 	tried map[string]bool, haveReset bool,
 ) *redis.Reply {
 	var err error
@@ -553,7 +553,7 @@ func (c *Cluster) addrForKeyInner(key string) string {
 // inside Cluster, meaning you must call Close() on it when you're done with it.
 // Cluster will generate new connections for its pool if need be, so don't worry
 // about not having to return it.
-func (c *Cluster) ClientForKey(key string) (*redis.Client, string, error) {
+func (c *Cluster) ClientForKey(key string) (redis.Client, string, error) {
 	addr, client, err := c.getConn(key, "")
 	return client, addr, err
 }

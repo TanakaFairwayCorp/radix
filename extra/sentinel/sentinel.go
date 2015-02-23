@@ -78,7 +78,7 @@ func (ce *ClientError) Error() string {
 }
 
 type getReqRet struct {
-	conn *redis.Client
+	conn redis.Client
 	err  *ClientError
 }
 
@@ -89,7 +89,7 @@ type getReq struct {
 
 type putReq struct {
 	name string
-	conn *redis.Client
+	conn redis.Client
 }
 
 type switchMaster struct {
@@ -241,7 +241,7 @@ func (c *Client) spin() {
 // Retrieves a connection for the master of the given name. If sentinel has
 // become unreachable this will always return an error. Close should be called
 // in that case. The returned error is a *ClientError.
-func (c *Client) GetMaster(name string) (*redis.Client, error) {
+func (c *Client) GetMaster(name string) (redis.Client, error) {
 	req := getReq{name, make(chan *getReqRet)}
 	c.getCh <- &req
 	ret := <-req.retCh
@@ -254,7 +254,7 @@ func (c *Client) GetMaster(name string) (*redis.Client, error) {
 // Return a connection for a master of a given name. As with the pool package,
 // do not return a connection which is having connectivity issues, or which is
 // otherwise unable to perform requests.
-func (c *Client) PutMaster(name string, client *redis.Client) {
+func (c *Client) PutMaster(name string, client redis.Client) {
 	c.putCh <- &putReq{name, client}
 }
 
@@ -280,7 +280,7 @@ func (c *Client) PutMaster(name string, client *redis.Client) {
 //		return redisErr
 //	}
 func (c *Client) CarefullyPutMaster(
-	name string, client *redis.Client, potentialErr *error,
+	name string, client redis.Client, potentialErr *error,
 ) {
 	if potentialErr != nil && *potentialErr != nil {
 		// If the client sent back that it's READONLY then we don't want to keep

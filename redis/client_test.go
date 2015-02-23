@@ -8,7 +8,7 @@ import (
 	"time"
 )
 
-func dial(t *T) *Client {
+func dial(t *T) Client {
 	client, err := DialTimeout("tcp", "127.0.0.1:6379", 10*time.Second)
 	assert.Nil(t, err)
 	return client

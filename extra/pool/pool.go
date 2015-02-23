@@ -12,12 +12,12 @@ import (
 type Pool struct {
 	network string
 	addr    string
-	pool    chan *redis.Client
+	pool    chan redis.Client
 	df      DialFunc
 }
 
 // A function which can be passed into NewCustomPool
-type DialFunc func(network, addr string) (*redis.Client, error)
+type DialFunc func(network, addr string) (redis.Client, error)
 
 // A Pool whose connections are all created using f(network, addr). The size
 // indicates the maximum number of idle connections to have waiting to be used
@@ -27,7 +27,7 @@ type DialFunc func(network, addr string) (*redis.Client, error)
 // The following is an example of using NewCustomPool to have all connections
 // automatically get AUTH called on them upon creation
 //
-// 	df := func(network, addr string) (*redis.Client, error) {
+// 	df := func(network, addr string) (redis.Client, error) {
 // 		client, err := redis.Dial(network, addr)
 // 		if err != nil {
 // 			return nil, err
@@ -41,7 +41,7 @@ type DialFunc func(network, addr string) (*redis.Client, error)
 // 	p, _ := pool.NewCustomPool("tcp", "127.0.0.1:6379", 10, df)
 //
 func NewCustomPool(network, addr string, size int, df DialFunc) (*Pool, error) {
-	pool := make([]*redis.Client, 0, size)
+	pool := make([]redis.Client, 0, size)
 	for i := 0; i < size; i++ {
 		client, err := df(network, addr)
 		if err != nil {
@@ -57,7 +57,7 @@ func NewCustomPool(network, addr string, size int, df DialFunc) (*Pool, error) {
 	p := Pool{
 		network: network,
 		addr:    addr,
-		pool:    make(chan *redis.Client, len(pool)),
+		pool:    make(chan redis.Client, len(pool)),
 		df:      df,
 	}
 	for i := range pool {
@@ -83,7 +83,7 @@ func NewOrEmptyPool(network, addr string, size int) *Pool {
 		pool = &Pool{
 			network: network,
 			addr:    addr,
-			pool:    make(chan *redis.Client, size),
+			pool:    make(chan redis.Client, size),
 			df:      redis.Dial,
 		}
 	}
@@ -92,7 +92,7 @@ func NewOrEmptyPool(network, addr string, size int) *Pool {
 
 // Retrieves an available redis client. If there are none available it will
 // create a new one on the fly
-func (p *Pool) Get() (*redis.Client, error) {
+func (p *Pool) Get() (redis.Client, error) {
 	select {
 	case conn := <-p.pool:
 		return conn, nil
@@ -105,7 +105,7 @@ func (p *Pool) Get() (*redis.Client, error) {
 // instead. If the client is already closed (due to connection failure or
 // what-have-you) it should not be put back in the pool. The pool will create
 // more connections as needed.
-func (p *Pool) Put(conn *redis.Client) {
+func (p *Pool) Put(conn redis.Client) {
 	select {
 	case p.pool <- conn:
 	default:
@@ -137,7 +137,7 @@ func (p *Pool) Put(conn *redis.Client) {
 // If we were just using the normal Put we wouldn't be able to defer it because
 // we don't want to Put back a connection which is broken. This method takes
 // care of doing that check so we can still use the convenient defer
-func (p *Pool) CarefullyPut(conn *redis.Client, potentialErr *error) {
+func (p *Pool) CarefullyPut(conn redis.Client, potentialErr *error) {
 	if potentialErr != nil && *potentialErr != nil {
 		// We don't care about command errors, they don't indicate anything
 		// about the connection integrity
@@ -153,7 +153,7 @@ func (p *Pool) CarefullyPut(conn *redis.Client, potentialErr *error) {
 // Assuming there are no other connections waiting to be Put back this method
 // effectively closes and cleans up the pool.
 func (p *Pool) Empty() {
-	var conn *redis.Client
+	var conn redis.Client
 	for {
 		select {
 		case conn = <-p.pool:
